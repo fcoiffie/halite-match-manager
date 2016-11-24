@@ -15,26 +15,26 @@ def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
 class Match:
-    def __init__(self, player_paths, player_names, width, height, seed, time_limit):
+    def __init__(self, players, width, height, seed, time_limit):
         self.map_seed = seed
         self.width = width
         self.height = height
-        self.names = player_names
-        self.paths = player_paths
+        self.players = players
+        self.paths = [player.path for player in players]
         self.finished = False
-        self.result = [0 for _ in player_paths]
+        self.result = [0 for _ in players]
         self.return_code = None
         self.results_string = ""
         self.replay_file = ""
         self.total_time_limit = time_limit
         self.timeouts = []
-        self.num_players = len(player_paths)
+        self.num_players = len(players)
 
     def __repr__(self):
-        title1 = "Match between " + ", ".join(self.names) + "\n"
+        title1 = "Match between " + ", ".join([p.name for p in self.players]) + "\n"
         title2 = "Binaries are " + ", ".join(self.paths) + "\n"
         dims = "dimensions = " + str(self.width) + ", " + str(self.height) + "\n"
-        results = "\n".join([str(i) + " " + j for i, j in zip(self.result, self.names)]) + "\n"
+        results = "\n".join([str(i) + " " + j for i, j in zip(self.result, [p.name for p in self.players])]) + "\n"
         replay = self.replay_file + "\n\n"
         return title1 + title2 + dims + results + replay
 
@@ -87,9 +87,8 @@ class Manager:
         self.db = Database()
 
     def run_round(self, players, width, height, seed):
-        player_paths = [self.players[i].path for i in players]
-        player_names = [self.players[i].name for i in players]
-        m = Match(player_paths, player_names, width, height, seed, 2 * len(player_paths) * max_match_rounds(width, height))
+        o_players = [self.players[i] for i in players]
+        m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height))
         m.run_match(self.halite_binary)
         print(m)
 
