@@ -2,7 +2,11 @@
 import os
 import random
 import sys
+import math
 from subprocess import Popen, PIPE
+
+def max_match_rounds(width, height):
+    return math.sqrt(width * height)
 
 class Match:
     def __init__(self, player_paths, width, height, seed, time_limit):
@@ -61,23 +65,60 @@ class Match:
                     self.result[player] = rank
                 count += 1
 
+class Manager:
+    def __init__(self, halite_binary, player_binaries, size_min, size_max, players_min, players_max, rounds):
+        self.halite_binary = halite_binary
+        self.player_binaries = player_binaries
+        self.size_min = size_min
+        self.size_max = size_max
+        self.players_min = players_min
+        self.players_max = players_max
+        self.rounds = rounds
+        self.round_count = 0
+        self.results = []
+
+    def run_round(self, players, width, height, seed):
+        player_paths = [self.player_binaries[i] for i in players]
+        m = Match(player_paths, width, height, seed, 2 * len(player_paths) * max_match_rounds(width, height))
+        m.run_match(self.halite_binary)
+        self.results.append(m)
+        print(m)
+
+    def pick_players(self, num):
+        open_set = [i for i in range(0, len(self.player_binaries))]
+        players = []
+        count = 0
+        while count < num:
+            chosen = open_set[random.randint(0, len(open_set) - 1)]
+            players.append(chosen)
+            open_set.remove(chosen)
+            count += 1
+        return players
+
+    def run_rounds(self):
+        while self.round_count < self.rounds:
+            num_players = random.randint(2, len(self.player_binaries))
+            players = self.pick_players(num_players)
+            size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
+            size_h = size_w
+            seed = random.randint(100, 1073741824)
+            print ("running match...\n")
+            self.run_round(players, size_w, size_h, seed)
+            self.round_count += 1
 
 p1 = "./orchid"
 p2 = "./orchid"
 player_paths = [p1, p2]
-width, height = 30, 30
-seed = random.randint(100,sys.maxsize >> 32)
-time_limit = None
-m = Match(player_paths, width, height, seed, time_limit)
-m.run_match("./halite")
-print(m)
-#        from subprocess import call
-#        import os
-#        import sys
-#
-#        # cd to the script directory
-#        os.chdir(os.path.dirname(os.path.realpath(__file__)))
-#
-#        # the gradle `application` plugin generates a script to run your in `bin`
-##        call(['./bin/MyBot'], stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+m = Manager("./halite", player_paths, 20, 50, 2, 6, 5)
+m.run_rounds()
+
+#p1 = "./orchid"
+#p2 = "./orchid"
+#player_paths = [p1, p2]
+#width, height = 30, 30
+#seed = random.randint(100,1073741824)
+#time_limit = None
+#m = Match(player_paths, width, height, seed, time_limit)
+#m.run_match("./halite")
+#print(m)
 
