@@ -5,7 +5,10 @@ import sys
 import math
 import sqlite3
 import argparse
+import datetime
 from subprocess import Popen, PIPE
+
+halite_command = "./halite"
 
 def max_match_rounds(width, height):
     return math.sqrt(width * height)
@@ -68,7 +71,7 @@ class Match:
                 count += 1
 
 class Manager:
-    def __init__(self, halite_binary, player_binaries, size_min, size_max, players_min, players_max, rounds):
+    def __init__(self, halite_binary, player_binaries=None, size_min=20, size_max=50, players_min=2, players_max=6, rounds=-1):
         self.halite_binary = halite_binary
         self.player_binaries = player_binaries
         self.size_min = size_min
@@ -128,6 +131,8 @@ class Database:
             self.db.close()
         except: pass
 
+    def now(self):
+        return datetime.datetime.utcnow().strftime("%d.%m.%Y %H:%M:%S") #asctime()
     def recreate(self):
         cursor = self.db.cursor()
         try:
@@ -138,17 +143,17 @@ class Database:
             pass
 
     def update_deferred( self, sql, tup=() ):
-        cur = self.con.cursor()        
-        cur.execute(sql,tup)
+        cursor = self.db.cursor()        
+        cursor.execute(sql,tup)
         
     def update( self, sql, tup=() ):
         self.update_deferred(sql,tup)
-        self.con.commit()
+        self.db.commit()
         
     def retrieve( self, sql, tup=() ):
-        cur = self.con.cursor()        
-        cur.execute(sql,tup)
-        return cur.fetchall()
+        cursor = self.db.cursor()        
+        cursor.execute(sql,tup)
+        return cursor.fetchall()
 
     def add_match( self, match ):
         self.latest += 1
@@ -157,6 +162,9 @@ class Database:
 
     def add_player(self, name, path):
         self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 50.0, 50.0/3.0, 0, True))
+
+    def delete_player(self, name):
+        self.update("delete from players where name=?", [name])
 
     def get_player( self, names ):
         sql = "select * from players where name=?"
@@ -176,6 +184,7 @@ class Player:
 
 class Commandline:
     def __init__(self):
+        self.manager = Manager(halite_command)
         self.cmds = None
         self.parser = argparse.ArgumentParser()
         self.parser.add_argument("-a", "--addBot", dest="addBot",
@@ -202,10 +211,10 @@ class Commandline:
         self.cmds = self.parser.parse_args(args)
 
     def add_bot(self, bot, path):
-        pass
+        self.manager.add_player(bot, path)
 
     def delete_bot(self, bot):
-        pass
+        self.manager.db.delete_player(bot)
 
     def valid_botfile(self, path):
         return True
@@ -220,6 +229,10 @@ class Commandline:
         elif self.cmds.deleteBot != "":
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
+        elif self.cmds.showBots:
+            for p in self.manager.db.retrieve("select * from players order by skill desc"):
+                print(p)
+            
 
 
 cmdline = Commandline()
