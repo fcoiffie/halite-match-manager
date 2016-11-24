@@ -14,6 +14,9 @@ halite_command = "./halite"
 def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
+def update_ranks(players, ranks):
+    pass
+
 class Match:
     def __init__(self, players, width, height, seed, time_limit):
         self.map_seed = seed
@@ -22,7 +25,7 @@ class Match:
         self.players = players
         self.paths = [player.path for player in players]
         self.finished = False
-        self.result = [0 for _ in players]
+        self.results = [0 for _ in players]
         self.return_code = None
         self.results_string = ""
         self.replay_file = ""
@@ -34,7 +37,7 @@ class Match:
         title1 = "Match between " + ", ".join([p.name for p in self.players]) + "\n"
         title2 = "Binaries are " + ", ".join(self.paths) + "\n"
         dims = "dimensions = " + str(self.width) + ", " + str(self.height) + "\n"
-        results = "\n".join([str(i) + " " + j for i, j in zip(self.result, [p.name for p in self.players])]) + "\n"
+        results = "\n".join([str(i) + " " + j for i, j in zip(self.results, [p.name for p in self.players])]) + "\n"
         replay = self.replay_file + "\n\n"
         return title1 + title2 + dims + results + replay
 
@@ -53,6 +56,7 @@ class Match:
         self.return_code = p.returncode
         self.parse_results_string()
         shutil.move(self.replay_file, "replays")
+        update_ranks(self.players, self.results)
 
     def parse_results_string(self):
         lines = self.results_string.split("\n")
@@ -71,7 +75,7 @@ class Match:
                     token = line.split(" ")
                     rank = int(token[0])
                     player = int(token[1]) - 1
-                    self.result[player] = rank
+                    self.results[player] = rank
                 count += 1
 
 class Manager:
