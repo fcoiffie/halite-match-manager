@@ -4,6 +4,7 @@ import random
 import sys
 import math
 import sqlite3
+import argparse
 from subprocess import Popen, PIPE
 
 def max_match_rounds(width, height):
@@ -166,13 +167,23 @@ class Database:
 
 
 
-
 class Player:
     def __init__(self, name, path):
         self.name = name
         self.path = path
         self.mu = 50.0
         self.sigma = (50.0 / 3.0)
+
+class Commandline:
+    def __init__(self):
+        self.parser = argparse.ArgumentParser()
+        self.parser.add_argument("-a", "addBot", dest="addBot",
+                                 action = "store_true", default = False,
+                                 help = "Add a new bot with name and path")
+
+        self.parser.add_argument("-n", "", dest="--botName",
+                                 action = "store", default = "",
+                                 help = "Add a new bot with name and path")
 
 p1 = "./orchid"
 p2 = "./orchid"
