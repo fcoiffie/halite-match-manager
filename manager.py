@@ -6,6 +6,7 @@ import math
 import sqlite3
 import argparse
 import datetime
+import shutil
 from subprocess import Popen, PIPE
 
 halite_command = "./halite"
@@ -49,6 +50,7 @@ class Match:
         self.results_string = results.decode('ascii')
         self.return_code = p.returncode
         self.parse_results_string()
+        shutil.move(self.replay_file, "replays")
 
     def parse_results_string(self):
         lines = self.results_string.split("\n")
@@ -80,14 +82,12 @@ class Manager:
         self.players_max = players_max
         self.rounds = rounds
         self.round_count = 0
-        self.results = []
         self.db = Database()
 
     def run_round(self, players, width, height, seed):
         player_paths = [self.players[i].path for i in players]
         m = Match(player_paths, width, height, seed, 2 * len(player_paths) * max_match_rounds(width, height))
         m.run_match(self.halite_binary)
-        self.results.append(m)
         print(m)
 
     def pick_players(self, num):
