@@ -7,6 +7,8 @@ import sqlite3
 import argparse
 import datetime
 import shutil
+import skills
+from skills import trueskill
 from subprocess import Popen, PIPE
 
 halite_command = "./halite"
@@ -15,7 +17,24 @@ def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
 def update_ranks(players, ranks):
-    pass
+    """ Update skills based on ranks from a match """
+    teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
+    match = skills.Match(teams, ranks)
+    calc = trueskill.FactorGraphTrueSkillCalculator()
+    game_info = trueskill.TrueSkillGameInfo()
+    updated = calc.new_ratings(match, game_info)
+    print("Updated:")
+    for team in updated:
+        for i in team.keys():
+            print(i)
+            print(team[i])
+
+#            player = next(i for i in players if i.name == player.player_id)
+#            player.mu = team[player].mean
+#            player.sigma = team[player].stdev
+#            player.skill = player.mu - 3 * player.sigma
+#def update_ranks(players, ranks):
+#    pass
 
 class Match:
     def __init__(self, players, width, height, seed, time_limit):
