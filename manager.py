@@ -71,9 +71,9 @@ class Match:
                 count += 1
 
 class Manager:
-    def __init__(self, halite_binary, player_binaries=None, size_min=20, size_max=50, players_min=2, players_max=6, rounds=-1):
+    def __init__(self, halite_binary, players=None, size_min=20, size_max=50, players_min=2, players_max=6, rounds=-1):
         self.halite_binary = halite_binary
-        self.player_binaries = player_binaries
+        self.players = players
         self.size_min = size_min
         self.size_max = size_max
         self.players_min = players_min
@@ -84,14 +84,14 @@ class Manager:
         self.db = Database()
 
     def run_round(self, players, width, height, seed):
-        player_paths = [self.player_binaries[i] for i in players]
+        player_paths = [self.players[i].path for i in players]
         m = Match(player_paths, width, height, seed, 2 * len(player_paths) * max_match_rounds(width, height))
         m.run_match(self.halite_binary)
         self.results.append(m)
         print(m)
 
     def pick_players(self, num):
-        open_set = [i for i in range(0, len(self.player_binaries))]
+        open_set = [i for i in range(0, len(self.players))]
         players = []
         count = 0
         while count < num:
@@ -103,7 +103,7 @@ class Manager:
 
     def run_rounds(self):
         while self.round_count < self.rounds:
-            num_players = random.randint(2, len(self.player_binaries))
+            num_players = random.randint(2, len(self.players))
             players = self.pick_players(num_players)
             size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
             size_h = size_w
@@ -173,20 +173,29 @@ class Database:
         return self.retrieve(sql, names )
         
 
-
-
 class Player:
-    def __init__(self, name, path):
+    def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 50.0, sigma = (50.0 / 3.0), ngames = 0, active = 1):
         self.name = name
         self.path = path
-        self.mu = 50.0
-        self.sigma = (50.0 / 3.0)
+        self.last_seen = last_seen
+        self.rank = rank
+        self.skill = skill
+        self.mu = mu
+        self.sigma = sigma
+        self.ngames = ngames
+        self.active = active
+
+def parse_player_record (player):
+    (player_id, name, path, last_seen, rank, skill, mu, sigma, ngames, active) = player
+    return Player(name, path, last_seen, rank, skill, mu, sigma, ngames, active)
+    
 
 class Commandline:
     def __init__(self):
         self.manager = Manager(halite_command)
         self.cmds = None
         self.parser = argparse.ArgumentParser()
+        self.no_args = False
         self.parser.add_argument("-a", "--addBot", dest="addBot",
                                  action = "store", default = "",
                                  help = "Add a new bot with a name")
@@ -208,6 +217,8 @@ class Commandline:
                                  help = "Show a list of all bots")
 
     def parse(self, args):
+        if len(args) == 0:
+            self.no_args = True
         self.cmds = self.parser.parse_args(args)
 
     def add_bot(self, bot, path):
@@ -232,8 +243,17 @@ class Commandline:
         elif self.cmds.showBots:
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
                 print(p)
-            
-
+        elif self.no_args:
+            print ("No arguments supplied, attempting to run some games...")
+            player_records = self.manager.db.retrieve("select * from players where active > 0")
+            players = [parse_player_record(player) for player in player_records]
+            if len(players) < 2:
+                print("Not enough players for a game. Need at least " + str(self.manager.players_min) + ", only have " + str(len(players)))
+                print("use the -h flag to get help")
+            else:
+                self.manager.players = players
+                self.manager.rounds = 1
+                self.manager.run_rounds()
 
 cmdline = Commandline()
 cmdline.parse(sys.argv[1:])
