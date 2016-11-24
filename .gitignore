@@ -2,4 +2,6 @@
 *sqlite3
 *pyc
 ignore
-
+*.hlt
+orchid
+halite
