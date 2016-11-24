@@ -132,7 +132,7 @@ class Database:
         cursor = self.db.cursor()
         try:
             cursor.execute("create table games(id integer, players text, map integer, datum date, turns integer default 0)")
-            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 50.0, sigma real default 13.3,ngames integer default 0)")
+            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 50.0, sigma real default 13.3,ngames integer default 0, active integer default 1)")
             self.db.commit()
         except:
             pass
@@ -156,7 +156,7 @@ class Database:
         self.update("insert into games values(?,?,?,?,?,?)", (self.latest,players,match.map_seed,self.now(),turns)) 
 
     def add_player(self, name, path):
-        self.update("insert into players values(?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 50.0, 50.0/3.0, 0))
+        self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 50.0, 50.0/3.0, 0, True))
 
     def get_player( self, names ):
         sql = "select * from players where name=?"
@@ -176,20 +176,61 @@ class Player:
 
 class Commandline:
     def __init__(self):
+        self.cmds = None
         self.parser = argparse.ArgumentParser()
-        self.parser.add_argument("-a", "addBot", dest="addBot",
-                                 action = "store_true", default = False,
-                                 help = "Add a new bot with name and path")
-
-        self.parser.add_argument("-n", "", dest="--botName",
+        self.parser.add_argument("-a", "--addBot", dest="addBot",
                                  action = "store", default = "",
-                                 help = "Add a new bot with name and path")
+                                 help = "Add a new bot with a name")
 
-p1 = "./orchid"
-p2 = "./orchid"
-player_paths = [p1, p2]
-m = Manager("./halite", player_paths, 20, 50, 2, 6, 5)
-m.run_rounds()
+        self.parser.add_argument("-d", "--deleteBot", dest="deleteBot",
+                                 action = "store", default = "",
+                                 help = "Delete the named bot")
+
+#        self.parser.add_argument("-n", "--botName", dest="botName",
+#                                 action = "store", default = "",
+#                                 help = "Specify a name for a new bot")
+
+        self.parser.add_argument("-p", "--botPath", dest="botPath",
+                                 action = "store", default = "",
+                                 help = "Specify the path for a new bot")
+
+        self.parser.add_argument("-s", "--showBots", dest="showBots",
+                                 action = "store_true", default = False,
+                                 help = "Show a list of all bots")
+
+    def parse(self, args):
+        self.cmds = self.parser.parse_args(args)
+
+    def add_bot(self, bot, path):
+        pass
+
+    def delete_bot(self, bot):
+        pass
+
+    def valid_botfile(self, path):
+        return True
+
+    def act(self):
+        if self.cmds.addBot != "":
+            print("Adding new bot...")
+            if self.cmds.botPath == "":
+                print ("You must specify the path for the new bot")
+            elif self.valid_botfile(self.cmds.botPath):
+                self.add_bot(self.cmds.addBot, self.cmds.botPath)
+        elif self.cmds.deleteBot != "":
+            print("Deleting bot...")
+            self.delete_bot(self.cmds.deleteBot)
+
+
+cmdline = Commandline()
+cmdline.parse(sys.argv[1:])
+cmdline.act()
+
+#p1 = "./orchid"
+#p2 = "./orchid"
+#player_paths = [p1, p2]
+#m = Manager("./halite", player_paths, 20, 50, 2, 6, 5)
+#m.run_rounds()
 
 #p1 = "./orchid"
 #p2 = "./orchid"
