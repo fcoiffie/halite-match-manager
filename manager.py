@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import math
+import sqlite3
 from subprocess import Popen, PIPE
 
 def max_match_rounds(width, height):
@@ -76,6 +77,7 @@ class Manager:
         self.rounds = rounds
         self.round_count = 0
         self.results = []
+        self.db = Database()
 
     def run_round(self, players, width, height, seed):
         player_paths = [self.player_binaries[i] for i in players]
@@ -101,10 +103,76 @@ class Manager:
             players = self.pick_players(num_players)
             size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
             size_h = size_w
-            seed = random.randint(100, 1073741824)
+            seed = random.randint(10000, 2073741824)
             print ("running match...\n")
             self.run_round(players, size_w, size_h, seed)
             self.round_count += 1
+
+    def add_player(self, name, path):
+        p = self.db.get_player((name,))
+        if len(p) == 0:
+            self.db.add_player(name, path)
+            
+class Database:
+    def __init__(self, filename="game_db.sqlite3"):
+        self.db = sqlite3.connect(filename)
+        self.recreate()
+        try:
+            self.latest = int(self.db.retrieve("select id from games order by id desc limit 1;",())[0][0])
+        except:
+            self.latest = 1
+
+    def __del__(self):
+        try:
+            self.db.close()
+        except: pass
+
+    def recreate(self):
+        cursor = self.db.cursor()
+        try:
+            cursor.execute("create table games(id integer, players text, map integer, datum date, turns integer default 0)")
+            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 50.0, sigma real default 13.3,ngames integer default 0)")
+            self.db.commit()
+        except:
+            pass
+
+    def update_deferred( self, sql, tup=() ):
+        cur = self.con.cursor()        
+        cur.execute(sql,tup)
+        
+    def update( self, sql, tup=() ):
+        self.update_deferred(sql,tup)
+        self.con.commit()
+        
+    def retrieve( self, sql, tup=() ):
+        cur = self.con.cursor()        
+        cur.execute(sql,tup)
+        return cur.fetchall()
+
+    def add_match( self, match ):
+        self.latest += 1
+        players = ", ".join(match.paths)
+        self.update("insert into games values(?,?,?,?,?,?)", (self.latest,players,match.map_seed,self.now(),turns)) 
+
+    def add_player(self, name, path):
+        self.update("insert into players values(?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 50.0, 50.0/3.0, 0))
+
+    def get_player( self, names ):
+        sql = "select * from players where name=?"
+        for n in names[1:]:
+            sql += " or name=?" 
+        return self.retrieve(sql, names )
+        
+
+
+
+
+class Player:
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+        self.mu = 50.0
+        self.sigma = (50.0 / 3.0)
 
 p1 = "./orchid"
 p2 = "./orchid"
