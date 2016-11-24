@@ -15,10 +15,11 @@ def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
 class Match:
-    def __init__(self, player_paths, width, height, seed, time_limit):
+    def __init__(self, player_paths, player_names, width, height, seed, time_limit):
         self.map_seed = seed
         self.width = width
         self.height = height
+        self.names = player_names
         self.paths = player_paths
         self.finished = False
         self.result = [0 for _ in player_paths]
@@ -30,11 +31,12 @@ class Match:
         self.num_players = len(player_paths)
 
     def __repr__(self):
-        title = "Match between " + ", ".join(self.paths) + "\n"
+        title1 = "Match between " + ", ".join(self.names) + "\n"
+        title2 = "Binaries are " + ", ".join(self.paths) + "\n"
         dims = "dimensions = " + str(self.width) + ", " + str(self.height) + "\n"
-        results = "\n".join([str(i) for i in self.result]) + "\n"
+        results = "\n".join([str(i) + " " + j for i, j in zip(self.result, self.names)]) + "\n"
         replay = self.replay_file + "\n\n"
-        return title + dims + results + replay
+        return title1 + title2 + dims + results + replay
 
     def get_command(self, halite_binary):
         dims = "-d " + str(self.width) + " " + str(self.height)
@@ -86,7 +88,8 @@ class Manager:
 
     def run_round(self, players, width, height, seed):
         player_paths = [self.players[i].path for i in players]
-        m = Match(player_paths, width, height, seed, 2 * len(player_paths) * max_match_rounds(width, height))
+        player_names = [self.players[i].name for i in players]
+        m = Match(player_paths, player_names, width, height, seed, 2 * len(player_paths) * max_match_rounds(width, height))
         m.run_match(self.halite_binary)
         print(m)
 
