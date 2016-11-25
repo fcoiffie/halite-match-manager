@@ -94,7 +94,6 @@ class Match:
         p = Popen(command, stdin=None, stdout=PIPE, stderr=None)
         results, _ = p.communicate(None, self.total_time_limit)
         self.results_string = results.decode('ascii')
-        print(self.results_string)
         self.return_code = p.returncode
         self.parse_results_string()
         update_ranks(self.players, copy.deepcopy(self.results))
