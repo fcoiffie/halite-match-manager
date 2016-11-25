@@ -1,6 +1,6 @@
 Halite Game Manager
 -------------------
-This is a small Python script which runs multiple games of Halite for easier testing.
+This is a small Python script which can run many games between local bots, producing ranking data which is stored in an sqlite3 database.
 
 It is incomplete but functional. More work may follow.
 
