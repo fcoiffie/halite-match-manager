@@ -360,10 +360,12 @@ class Commandline:
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
         
-        elif self.cmds.activateBot!= "":
+        elif self.cmds.activateBot != "":
+            print("Activating bot %s" %(self.cmds.activateBot))
             self.manager.db.activate_player(self.cmds.activateBot)
         
-        elif self.cmds.deactivateBot:
+        elif self.cmds.deactivateBot != "":
+            print("Deactivating bot %s" %(self.cmds.deactivateBot))
             self.manager.db.deactivate_player(self.cmds.deactivateBot)
         
         elif self.cmds.showRanks:
