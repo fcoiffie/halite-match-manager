@@ -16,6 +16,20 @@ halite_command = "./halite"
 def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
+def update_player_rank(players, player_name, skill_data):
+    print(player_name)
+    finished = False
+    for player in players:
+        if not finished:
+            print(player.name)
+            if player.name == player_name:
+                print("match")
+                player.mu = skill_data.mean
+                player.sigma = skill_data.stdev
+                player.update_skill()
+                finished = True
+                print("skill = %4f\tmu = %3f\tsigma = %3f\tname = %s" % (player.skill, player.mu, player.sigma, str(i)))
+
 def update_ranks(players, ranks):
     """ Update skills based on ranks from a match """
     teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
@@ -23,18 +37,11 @@ def update_ranks(players, ranks):
     calc = trueskill.FactorGraphTrueSkillCalculator()
     game_info = trueskill.TrueSkillGameInfo()
     updated = calc.new_ratings(match, game_info)
-    print("Updated:")
+    print ("Updating ranks")
     for team in updated:
         for i in team.keys():
-            print(i)
-            print(team[i])
-
-#            player = next(i for i in players if i.name == player.player_id)
-#            player.mu = team[player].mean
-#            player.sigma = team[player].stdev
-#            player.skill = player.mu - 3 * player.sigma
-#def update_ranks(players, ranks):
-#    pass
+            skill_data = team[i]
+            update_player_rank(players, i, skill_data)
 
 class Match:
     def __init__(self, players, width, height, seed, time_limit):
@@ -66,7 +73,7 @@ class Match:
         seed = "-s " + str(self.map_seed)
         result = [halite_binary, dims, quiet, seed]
         return result + self.paths
-        
+
     def run_match(self, halite_binary):
         command = self.get_command(halite_binary)
         p = Popen(command, stdin=None, stdout=PIPE, stderr=None)
@@ -113,7 +120,12 @@ class Manager:
         o_players = [self.players[i] for i in players]
         m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height))
         m.run_match(self.halite_binary)
+        self.save_players(players)
         print(m)
+
+    def save_players(self, players):
+        for player in players:
+            self.db.save_player(self.players[player])
 
     def pick_players(self, num):
         open_set = [i for i in range(0, len(self.players))]
@@ -143,7 +155,7 @@ class Manager:
             self.db.add_player(name, path)
             
 class Database:
-    def __init__(self, filename="game_db.sqlite3"):
+    def __init__(self, filename="db.sqlite3"):
         self.db = sqlite3.connect(filename)
         self.recreate()
         try:
@@ -197,6 +209,12 @@ class Database:
             sql += " or name=?" 
         return self.retrieve(sql, names )
         
+    def save_player(self, player):
+        self.update_player_skill(player.name, player.skill, player.mu, player.sigma)
+
+    def update_player_skill(self, name, skill, mu, sigma ):
+        self.update_deferred("update players set ngames=ngames+1,lastseen=?,skill=?,mu=?,sigma=? where name=?", (self.now(), skill, mu, sigma, name))
+	
 
 class Player:
     def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 50.0, sigma = (50.0 / 3.0), ngames = 0, active = 1):
@@ -209,6 +227,9 @@ class Player:
         self.sigma = sigma
         self.ngames = ngames
         self.active = active
+
+    def update_skill(self):
+        self.skill = self.mu - (self.sigma * 3)
 
 def parse_player_record (player):
     (player_id, name, path, last_seen, rank, skill, mu, sigma, ngames, active) = player
