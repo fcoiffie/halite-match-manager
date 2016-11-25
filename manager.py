@@ -160,6 +160,8 @@ class Manager:
         p = self.db.get_player((name,))
         if len(p) == 0:
             self.db.add_player(name, path)
+        else:
+            print ("Bot name %s already used, no bot added" %(name))
             
 class Database:
     def __init__(self, filename=db_filename):
