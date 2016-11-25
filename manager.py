@@ -12,6 +12,9 @@ from skills import trueskill
 from subprocess import Popen, PIPE
 
 halite_command = "./halite"
+replay_dir = "replays"
+db_filename = "db.sqlite3"
+keep_replays = True
 
 def max_match_rounds(width, height):
     return math.sqrt(width * height)
@@ -78,8 +81,12 @@ class Match:
         self.results_string = results.decode('ascii')
         self.return_code = p.returncode
         self.parse_results_string()
-        shutil.move(self.replay_file, "replays")
         update_ranks(self.players, self.results)
+        if keep_replays:
+            if not os.path.exists(replay_dir):
+                os.makedirs(replay_dir)
+            shutil.move(self.replay_file, replay_dir)
+        else: os.remove(self.replay_file)
 
     def parse_results_string(self):
         lines = self.results_string.split("\n")
@@ -153,7 +160,7 @@ class Manager:
             self.db.add_player(name, path)
             
 class Database:
-    def __init__(self, filename="db.sqlite3"):
+    def __init__(self, filename=db_filename):
         self.db = sqlite3.connect(filename)
         self.recreate()
         try:
@@ -258,11 +265,17 @@ class Commandline:
 
         self.parser.add_argument("-s", "--showBots", dest="showBots",
                                  action = "store_true", default = False,
-                                 help = "Show a list of all bots")
+                                 help = "Show a list of all bots, ordered by skill")
 
+        self.parser.add_argument("-m", "--match", dest="match",
+                                 action = "store_true", default = False,
+                                 help = "Run a single match")
         self.parser.add_argument("-f", "--forever", dest="forever",
                                  action = "store_true", default = False,
                                  help = "Run games forever (or until interrupted)")
+        self.parser.add_argument("-n", "--no-replays", dest="deleteReplays",
+                                 action = "store_true", default = False,
+                                 help = "Do not store replays")
 
     def parse(self, args):
         if len(args) == 0:
@@ -278,7 +291,20 @@ class Commandline:
     def valid_botfile(self, path):
         return True
 
+    def run_matches(self, rounds):
+        player_records = self.manager.db.retrieve("select * from players where active > 0")
+        players = [parse_player_record(player) for player in player_records]
+        if len(players) < 2:
+            print("Not enough players for a game. Need at least " + str(self.manager.players_min) + ", only have " + str(len(players)))
+            print("use the -h flag to get help")
+        else:
+            self.manager.players = players
+            self.manager.rounds = rounds
+            self.manager.run_rounds()
+
     def act(self):
+        if self.cmds.deleteReplays:
+            keep_replays = False
         if self.cmds.addBot != "":
             print("Adding new bot...")
             if self.cmds.botPath == "":
@@ -291,29 +317,14 @@ class Commandline:
         elif self.cmds.showBots:
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
                 print(p)
-        elif self.no_args:
-            print ("No arguments supplied, attempting to run a single match.")
-            player_records = self.manager.db.retrieve("select * from players where active > 0")
-            players = [parse_player_record(player) for player in player_records]
-            if len(players) < 2:
-                print("Not enough players for a game. Need at least " + str(self.manager.players_min) + ", only have " + str(len(players)))
-                print("use the -h flag to get help")
-            else:
-                self.manager.players = players
-                self.manager.rounds = 1
-                self.manager.run_rounds()
-        elif self.cmds.forever: # FIXME refactor this
+        elif self.cmds.match:
+            print ("Running a single match.")
+            self.run_matches(1)
+        elif self.cmds.forever:
             print ("Running matches until interrupted. Press Ctrl+C to stop.")
-            player_records = self.manager.db.retrieve("select * from players where active > 0")
-            players = [parse_player_record(player) for player in player_records]
-            if len(players) < 2:
-                print("Not enough players for a game. Need at least " + str(self.manager.players_min) + ", only have " + str(len(players)))
-                print("use the -h flag to get help")
-            else:
-                self.manager.players = players
-                self.manager.rounds = -1
-                self.manager.run_rounds()
-            
+            self.run_matches(-1)
+        elif self.no_args:
+            self.parser.print_help()
 
 cmdline = Commandline()
 cmdline.parse(sys.argv[1:])
