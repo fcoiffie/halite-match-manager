@@ -157,6 +157,10 @@ class Manager:
         open_set = [i for i in range(0, len(self.players))]
         players = []
         count = 0
+	high_sigma = sorted(self.players, key=lambda x: x.sigma, reverse=True)[0]
+        high_sigma_i = self.players.index(high_sigma)
+        players.append(high_sigma_i)
+        open_set.remove(high_sigma_i)
         while count < num:
             chosen = open_set[random.randint(0, len(open_set) - 1)]
             players.append(chosen)
