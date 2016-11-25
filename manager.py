@@ -28,7 +28,6 @@ from subprocess import Popen, PIPE
 halite_command = "./halite"
 replay_dir = "replays"
 db_filename = "db.sqlite3"
-keep_replays = True
 
 def max_match_rounds(width, height):
     return math.sqrt(width * height) * 10.0
@@ -58,7 +57,7 @@ def update_ranks(players, ranks):
             update_player_skill(players, i, skill_data)
 
 class Match:
-    def __init__(self, players, width, height, seed, time_limit):
+    def __init__(self, players, width, height, seed, time_limit, keep_replays):
         self.map_seed = seed
         self.width = width
         self.height = height
@@ -72,6 +71,7 @@ class Match:
         self.total_time_limit = time_limit
         self.timeouts = []
         self.num_players = len(players)
+        self.keep_replay = keep_replays
 
     def __repr__(self):
         title1 = "Match between " + ", ".join([p.name for p in self.players]) + "\n"
@@ -96,11 +96,14 @@ class Match:
         self.return_code = p.returncode
         self.parse_results_string()
         update_ranks(self.players, self.results)
-        if keep_replays:
+        if self.keep_replay:
+            print("Keeping replay")
             if not os.path.exists(replay_dir):
                 os.makedirs(replay_dir)
             shutil.move(self.replay_file, replay_dir)
-        else: os.remove(self.replay_file)
+        else: 
+            print("Deleting replay")
+            os.remove(self.replay_file)
 
     def parse_results_string(self):
         lines = self.results_string.split("\n")
@@ -132,11 +135,12 @@ class Manager:
         self.players_max = players_max
         self.rounds = rounds
         self.round_count = 0
+        self.keep_replays = True
         self.db = Database()
 
     def run_round(self, players, width, height, seed):
         o_players = [self.players[i] for i in players]
-        m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height))
+        m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height), self.keep_replays)
         print(m)
         m.run_match(self.halite_binary)
         print(m)
@@ -342,30 +346,39 @@ class Commandline:
 
     def act(self):
         if self.cmds.deleteReplays:
-            keep_replays = False
+            print("keep_replays = False")
+            self.manager.keep_replays = False
+
         if self.cmds.addBot != "":
             print("Adding new bot...")
             if self.cmds.botPath == "":
                 print ("You must specify the path for the new bot")
             elif self.valid_botfile(self.cmds.botPath):
                 self.add_bot(self.cmds.addBot, self.cmds.botPath)
+        
         elif self.cmds.deleteBot != "":
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
+        
+        elif self.cmds.activateBot!= "":
+            self.manager.db.activate_player(self.cmds.activateBot)
+        
+        elif self.cmds.deactivateBot:
+            self.manager.db.deactivate_player(self.cmds.deactivateBot)
+        
         elif self.cmds.showRanks:
             print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
                 print(str(parse_player_record(p)))
+        
         elif self.cmds.match:
             print ("Running a single match.")
             self.run_matches(1)
+        
         elif self.cmds.forever:
             print ("Running matches until interrupted. Press Ctrl+C to stop.")
             self.run_matches(-1)
-        elif self.cmds.activateBot!= "":
-            self.manager.db.activate_player(self.cmds.activateBot)
-        elif self.cmds.deactivateBot:
-            self.manager.db.deactivate_player(self.cmds.deactivateBot)
+        
         elif self.no_args:
             self.parser.print_help()
 
