@@ -310,6 +310,10 @@ class Commandline:
                                  action = "store_true", default = False,
                                  help = "Show a list of all bots, ordered by skill")
 
+        self.parser.add_argument("-t", "--showRanksTsv", dest="showRanksTsv",
+                                 action = "store_true", default = False,
+                                 help = "Show a list of all bots ordered by skill, with headings in TSV format like the rest of the data")
+
         self.parser.add_argument("-m", "--match", dest="match",
                                  action = "store_true", default = False,
                                  help = "Run a single match")
@@ -371,6 +375,11 @@ class Commandline:
         
         elif self.cmds.showRanks:
             print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
+            for p in self.manager.db.retrieve("select * from players order by skill desc"):
+                print(str(parse_player_record(p)))
+        
+        elif self.cmds.showRanksTsv:
+            print ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
                 print(str(parse_player_record(p)))
         
