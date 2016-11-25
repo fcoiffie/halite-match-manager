@@ -125,6 +125,7 @@ class Manager:
         m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height))
         print(m)
         m.run_match(self.halite_binary)
+        print(m)
         self.save_players(o_players)
 
     def save_players(self, players):
@@ -145,7 +146,7 @@ class Manager:
 
     def run_rounds(self):
         while (self.rounds < 0) or (self.round_count < self.rounds):
-            num_players = random.randint(2, len(self.players))
+            num_players = random.randint(2, min(self.players_max, len(self.players)))
             players = self.pick_players(num_players)
             size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
             size_h = size_w
