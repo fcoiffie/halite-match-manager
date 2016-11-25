@@ -233,6 +233,9 @@ class Player:
         self.ngames = ngames
         self.active = active
 
+    def __repr__(self):
+        return "%s\t%s\t%d\t%3f\t%3f\t%3f\t%d\t%d" % (self.name, self.last_seen, self.rank, self.skill, self.mu, self.sigma, self.ngames, self.active)
+
     def update_skill(self):
         self.skill = self.mu - (self.sigma * 3)
 
@@ -315,8 +318,9 @@ class Commandline:
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
         elif self.cmds.showBots:
+            print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
-                print(p)
+                print(str(parse_player_record(p)))
         elif self.cmds.match:
             print ("Running a single match.")
             self.run_matches(1)
@@ -329,20 +333,4 @@ class Commandline:
 cmdline = Commandline()
 cmdline.parse(sys.argv[1:])
 cmdline.act()
-
-#p1 = "./orchid"
-#p2 = "./orchid"
-#player_paths = [p1, p2]
-#m = Manager("./halite", player_paths, 20, 50, 2, 6, 5)
-#m.run_rounds()
-
-#p1 = "./orchid"
-#p2 = "./orchid"
-#player_paths = [p1, p2]
-#width, height = 30, 30
-#seed = random.randint(100,1073741824)
-#time_limit = None
-#m = Match(player_paths, width, height, seed, time_limit)
-#m.run_match("./halite")
-#print(m)
 
