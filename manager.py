@@ -17,18 +17,15 @@ def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
 def update_player_rank(players, player_name, skill_data):
-    print(player_name)
     finished = False
     for player in players:
         if not finished:
-            print(player.name)
-            if player.name == player_name:
-                print("match")
+            if player.name == str(player_name):
                 player.mu = skill_data.mean
                 player.sigma = skill_data.stdev
                 player.update_skill()
                 finished = True
-                print("skill = %4f\tmu = %3f\tsigma = %3f\tname = %s" % (player.skill, player.mu, player.sigma, str(i)))
+                print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
 
 def update_ranks(players, ranks):
     """ Update skills based on ranks from a match """
@@ -119,13 +116,14 @@ class Manager:
     def run_round(self, players, width, height, seed):
         o_players = [self.players[i] for i in players]
         m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height))
-        m.run_match(self.halite_binary)
-        self.save_players(players)
         print(m)
+        m.run_match(self.halite_binary)
+        self.save_players(o_players)
 
     def save_players(self, players):
         for player in players:
-            self.db.save_player(self.players[player])
+            print("Saving player %s with %f skill" % (player.name, player.skill))
+            self.db.save_player(player)
 
     def pick_players(self, num):
         open_set = [i for i in range(0, len(self.players))]
@@ -139,7 +137,7 @@ class Manager:
         return players
 
     def run_rounds(self):
-        while self.round_count < self.rounds:
+        while (self.rounds < 0) or (self.round_count < self.rounds):
             num_players = random.randint(2, len(self.players))
             players = self.pick_players(num_players)
             size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
@@ -213,7 +211,7 @@ class Database:
         self.update_player_skill(player.name, player.skill, player.mu, player.sigma)
 
     def update_player_skill(self, name, skill, mu, sigma ):
-        self.update_deferred("update players set ngames=ngames+1,lastseen=?,skill=?,mu=?,sigma=? where name=?", (self.now(), skill, mu, sigma, name))
+        self.update("update players set ngames=ngames+1,lastseen=?,skill=?,mu=?,sigma=? where name=?", (self.now(), skill, mu, sigma, name))
 	
 
 class Player:
@@ -262,6 +260,10 @@ class Commandline:
                                  action = "store_true", default = False,
                                  help = "Show a list of all bots")
 
+        self.parser.add_argument("-f", "--forever", dest="forever",
+                                 action = "store_true", default = False,
+                                 help = "Run games forever (or until interrupted)")
+
     def parse(self, args):
         if len(args) == 0:
             self.no_args = True
@@ -290,7 +292,7 @@ class Commandline:
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
                 print(p)
         elif self.no_args:
-            print ("No arguments supplied, attempting to run some games...")
+            print ("No arguments supplied, attempting to run a single match.")
             player_records = self.manager.db.retrieve("select * from players where active > 0")
             players = [parse_player_record(player) for player in player_records]
             if len(players) < 2:
@@ -300,6 +302,18 @@ class Commandline:
                 self.manager.players = players
                 self.manager.rounds = 1
                 self.manager.run_rounds()
+        elif self.cmds.forever: # FIXME refactor this
+            print ("Running matches until interrupted. Press Ctrl+C to stop.")
+            player_records = self.manager.db.retrieve("select * from players where active > 0")
+            players = [parse_player_record(player) for player in player_records]
+            if len(players) < 2:
+                print("Not enough players for a game. Need at least " + str(self.manager.players_min) + ", only have " + str(len(players)))
+                print("use the -h flag to get help")
+            else:
+                self.manager.players = players
+                self.manager.rounds = -1
+                self.manager.run_rounds()
+            
 
 cmdline = Commandline()
 cmdline.parse(sys.argv[1:])
