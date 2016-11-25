@@ -31,7 +31,7 @@ db_filename = "db.sqlite3"
 keep_replays = True
 
 def max_match_rounds(width, height):
-    return math.sqrt(width * height)
+    return math.sqrt(width * height) * 10.0
 
 def update_player_skill(players, player_name, skill_data):
     finished = False
