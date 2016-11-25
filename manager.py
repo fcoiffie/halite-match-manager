@@ -13,6 +13,7 @@
 #      See the License for the specific language governing permissions and
 #      limitations under the License.
 
+import copy
 import os
 import random
 import sys
@@ -93,9 +94,10 @@ class Match:
         p = Popen(command, stdin=None, stdout=PIPE, stderr=None)
         results, _ = p.communicate(None, self.total_time_limit)
         self.results_string = results.decode('ascii')
+        print(self.results_string)
         self.return_code = p.returncode
         self.parse_results_string()
-        update_ranks(self.players, self.results)
+        update_ranks(self.players, copy.deepcopy(self.results))
         if self.keep_replay:
             print("Keeping replay")
             if not os.path.exists(replay_dir):
