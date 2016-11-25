@@ -2,5 +2,5 @@
 for i in bots/*
 do
    botname=${i/bots\//}
-  ./manager.py -a "$botname" -p "$i"/MyBot.native
+  ./manager.py -A "$botname" -p "$i"/MyBot.native
 done

@@ -19,7 +19,7 @@ keep_replays = True
 def max_match_rounds(width, height):
     return math.sqrt(width * height)
 
-def update_player_rank(players, player_name, skill_data):
+def update_player_skill(players, player_name, skill_data):
     finished = False
     for player in players:
         if not finished:
@@ -41,7 +41,7 @@ def update_ranks(players, ranks):
     for team in updated:
         for i in team.keys():
             skill_data = team[i]
-            update_player_rank(players, i, skill_data)
+            update_player_skill(players, i, skill_data)
 
 class Match:
     def __init__(self, players, width, height, seed, time_limit):
@@ -127,6 +127,7 @@ class Manager:
         m.run_match(self.halite_binary)
         print(m)
         self.save_players(o_players)
+        self.db.update_player_ranks()
 
     def save_players(self, players):
         for player in players:
@@ -221,6 +222,19 @@ class Database:
     def update_player_skill(self, name, skill, mu, sigma ):
         self.update("update players set ngames=ngames+1,lastseen=?,skill=?,mu=?,sigma=? where name=?", (self.now(), skill, mu, sigma, name))
 	
+    def update_player_rank( self, name, rank ):
+        self.update("update players set rank=? where name=?", (rank, name))
+
+    def update_player_ranks(self):
+        for i, p in enumerate(self.retrieve("select name from players order by skill desc",())):
+            self.update_player_rank( p[0], i+1 )
+        
+    def activate_player(self, name):
+        self.update("update players set active=? where name=?", (1, name))
+
+    def deactivate_player(self, name):
+        self.update("update players set active=? where name=?", (0, name))
+
 
 class Player:
     def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 50.0, sigma = (50.0 / 3.0), ngames = 0, active = 1):
@@ -251,23 +265,27 @@ class Commandline:
         self.cmds = None
         self.parser = argparse.ArgumentParser()
         self.no_args = False
-        self.parser.add_argument("-a", "--addBot", dest="addBot",
+        self.parser.add_argument("-A", "--addBot", dest="addBot",
                                  action = "store", default = "",
                                  help = "Add a new bot with a name")
 
-        self.parser.add_argument("-d", "--deleteBot", dest="deleteBot",
+        self.parser.add_argument("-D", "--deleteBot", dest="deleteBot",
                                  action = "store", default = "",
                                  help = "Delete the named bot")
 
-#        self.parser.add_argument("-n", "--botName", dest="botName",
-#                                 action = "store", default = "",
-#                                 help = "Specify a name for a new bot")
+        self.parser.add_argument("-a", "--activateBot", dest="activateBot",
+                                 action = "store", default = "",
+                                 help = "Activate the named bot")
+
+        self.parser.add_argument("-d", "--deactivateBot", dest="deactivateBot",
+                                 action = "store", default = "",
+                                 help = "Deactivate the named bot")
 
         self.parser.add_argument("-p", "--botPath", dest="botPath",
                                  action = "store", default = "",
                                  help = "Specify the path for a new bot")
 
-        self.parser.add_argument("-s", "--showBots", dest="showBots",
+        self.parser.add_argument("-r", "--showRanks", dest="showRanks",
                                  action = "store_true", default = False,
                                  help = "Show a list of all bots, ordered by skill")
 
@@ -318,7 +336,7 @@ class Commandline:
         elif self.cmds.deleteBot != "":
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
-        elif self.cmds.showBots:
+        elif self.cmds.showRanks:
             print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
             for p in self.manager.db.retrieve("select * from players order by skill desc"):
                 print(str(parse_player_record(p)))
@@ -328,6 +346,10 @@ class Commandline:
         elif self.cmds.forever:
             print ("Running matches until interrupted. Press Ctrl+C to stop.")
             self.run_matches(-1)
+        elif self.cmds.activateBot!= "":
+            self.manager.db.activate_player(self.cmds.activateBot)
+        elif self.cmds.deactivateBot:
+            self.manager.db.deactivate_player(self.cmds.deactivateBot)
         elif self.no_args:
             self.parser.print_help()
 
