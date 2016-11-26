@@ -25,7 +25,6 @@ import shutil
 import skills
 from skills import trueskill
 from subprocess import Popen, PIPE
-import random
 
 halite_command = "./halite"
 replay_dir = "replays"
@@ -36,15 +35,11 @@ def max_match_rounds(width, height):
 
 def update_player_skill(players, player_name, skill_data):
     """ Update the skill of one player """
-    finished = False
-    for player in players:
-        if not finished:
-            if player.name == str(player_name):
-                player.mu = skill_data.mean
-                player.sigma = skill_data.stdev
-                player.update_skill()
-                finished = True
-                print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
+    player = next(player for player in players if player.name == str(player_name))
+    player.mu = skill_data.mean
+    player.sigma = skill_data.stdev
+    player.update_skill()
+    print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
 
 def update_skills(players, ranks):
     """ Update player skills based on ranks from a match """
@@ -55,8 +50,7 @@ def update_skills(players, ranks):
     updated = calc.new_ratings(match, game_info)
     print ("Updating ranks")
     for team in updated:
-        for i in team.keys():
-            skill_data = team[i]
+        for i, skill_data in team.items():
             update_player_skill(players, i, skill_data)
 
 class Match:
@@ -129,13 +123,9 @@ class Match:
                 count += 1
 
 class Manager:
-    def __init__(self, halite_binary, players=None, size_min=20, size_max=50, players_min=2, players_max=6, rounds=-1):
+    def __init__(self, halite_binary, players=None, rounds=-1):
         self.halite_binary = halite_binary
         self.players = players
-        self.size_min = size_min
-        self.size_max = size_max
-        self.players_min = players_min
-        self.players_max = players_max
         self.rounds = rounds
         self.round_count = 0
         self.keep_replays = True
@@ -156,43 +146,25 @@ class Manager:
             print("Saving player %s with %f skill" % (player.name, player.skill))
             self.db.save_player(player)
 
-    def pick_players_priority_sigma(self, num):
-        open_set = [i for i in range(0, len(self.players))]
-        players = []
-        high_sigma = sorted(self.players, key=lambda x: x.sigma, reverse=True)[0]
-        high_sigma_i = self.players.index(high_sigma)
-        players.append(high_sigma_i)
-        open_set.remove(high_sigma_i)
-        count = 1
-        while count < num:
-            chosen = open_set[random.randint(0, len(open_set) - 1)]
-            players.append(chosen)
-            open_set.remove(chosen)
-            count += 1
-        return players
-
-    def pick_players_no_priority(self, num):
-        open_set = [i for i in range(0, len(self.players))]
-        players = []
-        count = 0
-        while count < num:
-            chosen = open_set[random.randint(0, len(open_set) - 1)]
-            players.append(chosen)
-            open_set.remove(chosen)
-            count += 1
-        return players
-
     def pick_players(self, num):
+        pool = list(range(len(self.players)))
+        players = list()
         if self.priority_sigma:
-            return self.pick_players_priority_sigma(num)
-        else:
-            return self.pick_players_no_priority(num)
+            high_sigma_index = max((player.sigma, index, player) for index, player in enumerate(self.players))[1]
+            players.append(high_sigma_index)
+            pool.remove(high_sigma_index)
+            num -= 1
+        random.shuffle(pool)
+        players.extend(pool[:num])
+        random.shuffle(players)
+        return players
+
 
     def run_rounds(self):
         while (self.rounds < 0) or (self.round_count < self.rounds):
-            num_players = random.randint(2, min(self.players_max, len(self.players)))
+            num_players = random.choice([2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6])
             players = self.pick_players(num_players)
-            size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
+            size_w = random.choice([20, 25, 25] + [30] * 3 + [35] * 4 + [40] * 3 + [45, 45, 50])
             size_h = size_w
             seed = random.randint(10000, 2073741824)
             print ("running match...\n")
@@ -256,9 +228,7 @@ class Database:
         self.update("delete from players where name=?", [name])
 
     def get_player( self, names ):
-        sql = "select * from players where name=?"
-        for n in names[1:]:
-            sql += " or name=?" 
+        sql = 'select * from players where name=? '  + ' '.join('or name=?' for _ in names[1:])
         return self.retrieve(sql, names )
         
     def save_player(self, player):
@@ -358,8 +328,7 @@ class Commandline:
                                  help = "Exclude inactive bots from ranking table")
 
     def parse(self, args):
-        if len(args) == 0:
-            self.no_args = True
+        self.no_args = not args
         self.cmds = self.parser.parse_args(args)
 
     def add_bot(self, bot, path):
@@ -392,29 +361,31 @@ class Commandline:
         if self.cmds.deleteReplays:
             print("keep_replays = False")
             self.manager.keep_replays = False
+            
         if self.cmds.equalPriority:
             print("priority_sigma = False")
             self.manager.priority_sigma = False
+            
         if self.cmds.excludeInactive:
             print("exclude_inactive = True")
             self.exclude_inactive = True
 
-        if self.cmds.addBot != "":
+        if self.cmds.addBot:
             print("Adding new bot...")
             if self.cmds.botPath == "":
                 print ("You must specify the path for the new bot")
             elif self.valid_botfile(self.cmds.botPath):
                 self.add_bot(self.cmds.addBot, self.cmds.botPath)
         
-        elif self.cmds.deleteBot != "":
+        elif self.cmds.deleteBot:
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
         
-        elif self.cmds.activateBot != "":
+        elif self.cmds.activateBot:
             print("Activating bot %s" %(self.cmds.activateBot))
             self.manager.db.activate_player(self.cmds.activateBot)
         
-        elif self.cmds.deactivateBot != "":
+        elif self.cmds.deactivateBot:
             print("Deactivating bot %s" %(self.cmds.deactivateBot))
             self.manager.db.deactivate_player(self.cmds.deactivateBot)
         
