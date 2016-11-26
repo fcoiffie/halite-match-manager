@@ -198,7 +198,7 @@ class Database:
         cursor = self.db.cursor()
         try:
             cursor.execute("create table games(id integer, players text, map integer, datum date, turns integer default 0)")
-            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 50.0, sigma real default 13.3,ngames integer default 0, active integer default 1)")
+            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 25.0, sigma real default 8.33,ngames integer default 0, active integer default 1)")
             self.db.commit()
         except:
             pass
@@ -222,7 +222,7 @@ class Database:
         self.update("insert into games values(?,?,?,?,?,?)", (self.latest,players,match.map_seed,self.now(),turns)) 
 
     def add_player(self, name, path):
-        self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 50.0, 50.0/3.0, 0, True))
+        self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 25.0, 25.0/3.0, 0, True))
 
     def delete_player(self, name):
         self.update("delete from players where name=?", [name])
@@ -252,7 +252,7 @@ class Database:
 
 
 class Player:
-    def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 50.0, sigma = (50.0 / 3.0), ngames = 0, active = 1):
+    def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 25.0, sigma = (25.0 / 3.0), ngames = 0, active = 1):
         self.name = name
         self.path = path
         self.last_seen = last_seen
