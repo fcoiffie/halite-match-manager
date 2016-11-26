@@ -381,7 +381,7 @@ class Commandline:
             print("keep_replays = False")
             self.manager.keep_replays = False
         if self.cmds.equalPriority:
-            print("keep_replays = False")
+            print("priority_sigma = False")
             self.manager.priority_sigma = False
 
         if self.cmds.addBot != "":
