@@ -309,6 +309,7 @@ class Commandline:
         self.cmds = None
         self.parser = argparse.ArgumentParser()
         self.no_args = False
+        self.exclude_inactive = False
         self.parser.add_argument("-A", "--addBot", dest="addBot",
                                  action = "store", default = "",
                                  help = "Add a new bot with a name")
@@ -351,6 +352,10 @@ class Commandline:
                                  action = "store_true", default = False,
                                  help = "Equal priority for all active bots (otherwise highest sigma will always be selected)")
 
+        self.parser.add_argument("-E", "--exclude-inactive", dest="excludeInactive",
+                                 action = "store_true", default = False,
+                                 help = "Exclude inactive bots from ranking table")
+
     def parse(self, args):
         if len(args) == 0:
             self.no_args = True
@@ -376,6 +381,12 @@ class Commandline:
             self.manager.rounds = rounds
             self.manager.run_rounds()
 
+    def player_list_sql(self):
+        if self.exclude_inactive:
+            return "select * from players where active > 0 order by skill desc"
+        else:
+            return "select * from players order by skill desc"
+
     def act(self):
         if self.cmds.deleteReplays:
             print("keep_replays = False")
@@ -383,6 +394,9 @@ class Commandline:
         if self.cmds.equalPriority:
             print("priority_sigma = False")
             self.manager.priority_sigma = False
+        if self.cmds.excludeInactive:
+            print("exclude_inactive = True")
+            self.exclude_inactive = True
 
         if self.cmds.addBot != "":
             print("Adding new bot...")
@@ -405,12 +419,14 @@ class Commandline:
         
         elif self.cmds.showRanks:
             print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
-            for p in self.manager.db.retrieve("select * from players order by skill desc"):
+            sql = self.player_list_sql()
+            for p in self.manager.db.retrieve(sql):
                 print(str(parse_player_record(p)))
         
         elif self.cmds.showRanksTsv:
             print ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
-            for p in self.manager.db.retrieve("select * from players order by skill desc"):
+            sql = self.player_list_sql()
+            for p in self.manager.db.retrieve(sql):
                 print(str(parse_player_record(p)))
         
         elif self.cmds.match:
