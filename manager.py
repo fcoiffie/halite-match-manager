@@ -25,6 +25,7 @@ import shutil
 import skills
 from skills import trueskill
 from subprocess import Popen, PIPE
+import random
 
 halite_command = "./halite"
 replay_dir = "replays"
@@ -122,8 +123,8 @@ class Match:
                     pass
                 elif count < (self.num_players * 2) + 1:
                     token = line.split(" ")
-                    rank = int(token[0])
-                    player = int(token[1]) - 1
+                    player = int(token[0]) - 1
+                    rank = int(token[1])
                     self.results[player] = rank
                 count += 1
 
