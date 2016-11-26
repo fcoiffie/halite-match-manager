@@ -44,7 +44,7 @@ def update_player_skill(players, player_name, skill_data):
                 finished = True
                 print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
 
-def update_ranks(players, ranks):
+def update_skills(players, ranks):
     """ Update skills based on ranks from a match """
     teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
     match = skills.Match(teams, ranks)
@@ -96,7 +96,7 @@ class Match:
         self.results_string = results.decode('ascii')
         self.return_code = p.returncode
         self.parse_results_string()
-        update_ranks(self.players, copy.deepcopy(self.results))
+        update_skills(self.players, copy.deepcopy(self.results))
         if self.keep_replay:
             print("Keeping replay")
             if not os.path.exists(replay_dir):
