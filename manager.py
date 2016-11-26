@@ -34,6 +34,7 @@ def max_match_rounds(width, height):
     return math.sqrt(width * height) * 10.0
 
 def update_player_skill(players, player_name, skill_data):
+    """ Update the skill of one player """
     finished = False
     for player in players:
         if not finished:
@@ -45,7 +46,7 @@ def update_player_skill(players, player_name, skill_data):
                 print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
 
 def update_skills(players, ranks):
-    """ Update skills based on ranks from a match """
+    """ Update player skills based on ranks from a match """
     teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
     match = skills.Match(teams, ranks)
     calc = trueskill.FactorGraphTrueSkillCalculator()
@@ -137,6 +138,7 @@ class Manager:
         self.rounds = rounds
         self.round_count = 0
         self.keep_replays = True
+        self.priority_sigma = True
         self.db = Database()
 
     def run_round(self, players, width, height, seed):
@@ -153,7 +155,7 @@ class Manager:
             print("Saving player %s with %f skill" % (player.name, player.skill))
             self.db.save_player(player)
 
-    def pick_players(self, num):
+    def pick_players_priority_sigma(self, num):
         open_set = [i for i in range(0, len(self.players))]
         players = []
         high_sigma = sorted(self.players, key=lambda x: x.sigma, reverse=True)[0]
@@ -167,6 +169,23 @@ class Manager:
             open_set.remove(chosen)
             count += 1
         return players
+
+    def pick_players_no_priority(self, num):
+        open_set = [i for i in range(0, len(self.players))]
+        players = []
+        count = 0
+        while count < num:
+            chosen = open_set[random.randint(0, len(open_set) - 1)]
+            players.append(chosen)
+            open_set.remove(chosen)
+            count += 1
+        return players
+
+    def pick_players(self, num):
+        if self.priority_sigma:
+            return self.pick_players_priority_sigma(num)
+        else:
+            return self.pick_players_no_priority(num)
 
     def run_rounds(self):
         while (self.rounds < 0) or (self.round_count < self.rounds):
@@ -328,6 +347,10 @@ class Commandline:
                                  action = "store_true", default = False,
                                  help = "Do not store replays")
 
+        self.parser.add_argument("-e", "--equal-priority", dest="equalPriority",
+                                 action = "store_true", default = False,
+                                 help = "Equal priority for all active bots (otherwise highest sigma will always be selected)")
+
     def parse(self, args):
         if len(args) == 0:
             self.no_args = True
@@ -357,6 +380,9 @@ class Commandline:
         if self.cmds.deleteReplays:
             print("keep_replays = False")
             self.manager.keep_replays = False
+        if self.cmds.equalPriority:
+            print("keep_replays = False")
+            self.manager.priority_sigma = False
 
         if self.cmds.addBot != "":
             print("Adding new bot...")
