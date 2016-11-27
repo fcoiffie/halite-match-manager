@@ -122,8 +122,8 @@ class Match:
                     pass
                 elif count < (self.num_players * 2) + 1:
                     token = line.split(" ")
-                    rank = int(token[0])
-                    player = int(token[1]) - 1
+                    rank = int(token[1])
+                    player = int(token[0]) - 1
                     self.results[player] = rank
                 count += 1
 
