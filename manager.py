@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 #  Copyright 2016 Jude Hungerford
 #  
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,18 +33,6 @@ db_filename = "db.sqlite3"
 def max_match_rounds(width, height):
     return math.sqrt(width * height) * 10.0
 
-def update_player_skill(players, player_name, skill_data):
-    """ Update the skill of one player """
-    finished = False
-    for player in players:
-        if not finished:
-            if player.name == str(player_name):
-                player.mu = skill_data.mean
-                player.sigma = skill_data.stdev
-                player.update_skill()
-                finished = True
-                print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
-
 def update_skills(players, ranks):
     """ Update player skills based on ranks from a match """
     teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
@@ -54,9 +42,13 @@ def update_skills(players, ranks):
     updated = calc.new_ratings(match, game_info)
     print ("Updating ranks")
     for team in updated:
-        for i in team.keys():
-            skill_data = team[i]
-            update_player_skill(players, i, skill_data)
+        player_name, skill_data = next(iter(team.items()))    #in Halite, teams will always be a team of one player
+        player = next(player for player in players if player.name == str(player_name))   #this suggests that players should be a dictionary instead of a list
+        player.mu = skill_data.mean
+        player.sigma = skill_data.stdev
+        player.update_skill()
+        print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
+
 
 class Match:
     def __init__(self, players, width, height, seed, time_limit, keep_replays):
@@ -112,8 +104,7 @@ class Match:
         if len(lines) < (2 + (2 * self.num_players)):
             raise ValueError("Not enough lines in match output")
         else:
-            count = 0
-            for line in lines:
+            for count, line in enumerate(lines):
                 if count == self.num_players: # replay file and seed
                     self.replay_file = line.split(" ")[0]
                 elif count == (self.num_players * 2) + 1: # timeouts
@@ -121,81 +112,59 @@ class Match:
                 elif count < self.num_players: # names
                     pass
                 elif count < (self.num_players * 2) + 1:
-                    token = line.split(" ")
-                    rank = int(token[1])
-                    player = int(token[0]) - 1
-                    self.results[player] = rank
-                count += 1
+                    player_index, rank = map(int, line.split())
+                    player_index -= 1   #zero-based indexing
+                    self.results[player_index] = rank
+
 
 class Manager:
-    def __init__(self, halite_binary, players=None, size_min=20, size_max=50, players_min=2, players_max=6, rounds=-1):
+    def __init__(self, halite_binary, players=None, rounds=-1):
         self.halite_binary = halite_binary
         self.players = players
-        self.size_min = size_min
-        self.size_max = size_max
-        self.players_min = players_min
-        self.players_max = players_max
         self.rounds = rounds
         self.round_count = 0
         self.keep_replays = True
         self.priority_sigma = True
         self.db = Database()
 
-    def run_round(self, players, width, height, seed):
-        o_players = [self.players[i] for i in players]
-        m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height), self.keep_replays)
+    def run_round(self, contestants, width, height, seed):
+        m = Match(contestants, width, height, seed, 2 * len(contestants) * max_match_rounds(width, height), self.keep_replays)
         print(m)
         m.run_match(self.halite_binary)
         print(m)
-        self.save_players(o_players)
+        self.save_players(contestants)
         self.db.update_player_ranks()
+        self.db.add_match(m)
 
     def save_players(self, players):
         for player in players:
             print("Saving player %s with %f skill" % (player.name, player.skill))
             self.db.save_player(player)
 
-    def pick_players_priority_sigma(self, num):
-        open_set = [i for i in range(0, len(self.players))]
-        players = []
-        high_sigma = sorted(self.players, key=lambda x: x.sigma, reverse=True)[0]
-        high_sigma_i = self.players.index(high_sigma)
-        players.append(high_sigma_i)
-        open_set.remove(high_sigma_i)
-        count = 1
-        while count < num:
-            chosen = open_set[random.randint(0, len(open_set) - 1)]
-            players.append(chosen)
-            open_set.remove(chosen)
-            count += 1
-        return players
-
-    def pick_players_no_priority(self, num):
-        open_set = [i for i in range(0, len(self.players))]
-        players = []
-        count = 0
-        while count < num:
-            chosen = open_set[random.randint(0, len(open_set) - 1)]
-            players.append(chosen)
-            open_set.remove(chosen)
-            count += 1
-        return players
-
-    def pick_players(self, num):
+    def pick_contestants(self, num):
+        pool = list(self.players)   #this makes a copy
+        contestants = list()
         if self.priority_sigma:
-            return self.pick_players_priority_sigma(num)
-        else:
-            return self.pick_players_no_priority(num)
+            high_sigma_index = max((player.sigma, i) for i, player in enumerate(self.players))[1]
+            high_sigma_contestant = self.players[high_sigma_index]
+            contestants.append(high_sigma_contestant)
+            pool.remove(high_sigma_contestant)
+            num -= 1
+        random.shuffle(pool)
+        contestants.extend(pool[:num])
+        random.shuffle(contestants)
+        return contestants
+
 
     def run_rounds(self):
         while (self.rounds < 0) or (self.round_count < self.rounds):
-            num_players = random.randint(2, min(self.players_max, len(self.players)))
-            players = self.pick_players(num_players)
-            size_w = random.randint((self.size_min / 5), (self.size_max / 5)) * 5
+            num_contestants = random.choice([2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6])
+            contestants = self.pick_contestants(num_contestants)
+            size_w = random.choice([20, 25, 25] + [30] * 3 + [35] * 4 + [40] * 3 + [45, 45, 50])
             size_h = size_w
             seed = random.randint(10000, 2073741824)
             print ("running match...\n")
-            self.run_round(players, size_w, size_h, seed)
+            self.run_round(contestants, size_w, size_h, seed)
             self.round_count += 1
 
     def add_player(self, name, path):
@@ -209,10 +178,6 @@ class Database:
     def __init__(self, filename=db_filename):
         self.db = sqlite3.connect(filename)
         self.recreate()
-        try:
-            self.latest = int(self.db.retrieve("select id from games order by id desc limit 1;",())[0][0])
-        except:
-            self.latest = 1
 
     def __del__(self):
         try:
@@ -220,12 +185,13 @@ class Database:
         except: pass
 
     def now(self):
-        return datetime.datetime.utcnow().strftime("%d.%m.%Y %H:%M:%S") #asctime()
+        return datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
     def recreate(self):
         cursor = self.db.cursor()
         try:
-            cursor.execute("create table games(id integer, players text, map integer, datum date, turns integer default 0)")
-            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 50.0, sigma real default 13.3,ngames integer default 0, active integer default 1)")
+            cursor.execute("create table games(id integer primary key autoincrement, name text, finish integer, field_size integer, map_size integer, map_seed integer, timestamp date, replay_file text)")
+            cursor.execute("create table players(id integer primary key, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 25.0, sigma real default 8.33,ngames integer default 0, active integer default 1)")
             self.db.commit()
         except:
             pass
@@ -237,6 +203,11 @@ class Database:
     def update( self, sql, tup=() ):
         self.update_deferred(sql,tup)
         self.db.commit()
+
+    def update_many(self, sql, iterable):
+        cursor = self.db.cursor()
+        cursor.executemany(sql, iterable)
+        self.db.commit()
         
     def retrieve( self, sql, tup=() ):
         cursor = self.db.cursor()        
@@ -244,20 +215,16 @@ class Database:
         return cursor.fetchall()
 
     def add_match( self, match ):
-        self.latest += 1
-        players = ", ".join(match.paths)
-        self.update("insert into games values(?,?,?,?,?,?)", (self.latest,players,match.map_seed,self.now(),turns)) 
+        self.update_many("INSERT INTO games (name, finish, field_size, map_size, map_seed, timestamp, replay_file) VALUES (?,?,?,?,?,?,?)", [(player.name, rank, match.num_players, match.width, match.map_seed, self.now(), match.replay_file) for player, rank in zip(match.players, match.results)])
 
     def add_player(self, name, path):
-        self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 50.0, 50.0/3.0, 0, True))
+        self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 25.0, 25.0/3.0, 0, True))
 
     def delete_player(self, name):
         self.update("delete from players where name=?", [name])
 
     def get_player( self, names ):
-        sql = "select * from players where name=?"
-        for n in names[1:]:
-            sql += " or name=?" 
+        sql = 'select * from players where name=? '  + ' '.join('or name=?' for _ in names[1:])
         return self.retrieve(sql, names )
         
     def save_player(self, player):
@@ -281,7 +248,7 @@ class Database:
 
 
 class Player:
-    def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 50.0, sigma = (50.0 / 3.0), ngames = 0, active = 1):
+    def __init__(self, name, path, last_seen = "", rank = 1000, skill = 0.0, mu = 25.0, sigma = (25.0 / 3.0), ngames = 0, active = 1):
         self.name = name
         self.path = path
         self.last_seen = last_seen
@@ -357,8 +324,7 @@ class Commandline:
                                  help = "Exclude inactive bots from ranking table")
 
     def parse(self, args):
-        if len(args) == 0:
-            self.no_args = True
+        self.no_args = not args
         self.cmds = self.parser.parse_args(args)
 
     def add_bot(self, bot, path):
@@ -391,29 +357,31 @@ class Commandline:
         if self.cmds.deleteReplays:
             print("keep_replays = False")
             self.manager.keep_replays = False
+            
         if self.cmds.equalPriority:
             print("priority_sigma = False")
             self.manager.priority_sigma = False
+            
         if self.cmds.excludeInactive:
             print("exclude_inactive = True")
             self.exclude_inactive = True
 
-        if self.cmds.addBot != "":
+        if self.cmds.addBot:
             print("Adding new bot...")
             if self.cmds.botPath == "":
                 print ("You must specify the path for the new bot")
             elif self.valid_botfile(self.cmds.botPath):
                 self.add_bot(self.cmds.addBot, self.cmds.botPath)
         
-        elif self.cmds.deleteBot != "":
+        elif self.cmds.deleteBot:
             print("Deleting bot...")
             self.delete_bot(self.cmds.deleteBot)
         
-        elif self.cmds.activateBot != "":
+        elif self.cmds.activateBot:
             print("Activating bot %s" %(self.cmds.activateBot))
             self.manager.db.activate_player(self.cmds.activateBot)
         
-        elif self.cmds.deactivateBot != "":
+        elif self.cmds.deactivateBot:
             print("Deactivating bot %s" %(self.cmds.deactivateBot))
             self.manager.db.deactivate_player(self.cmds.deactivateBot)
         
