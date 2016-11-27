@@ -33,14 +33,6 @@ db_filename = "db.sqlite3"
 def max_match_rounds(width, height):
     return math.sqrt(width * height) * 10.0
 
-def update_player_skill(players, player_name, skill_data):
-    """ Update the skill of one player """
-    player = next(player for player in players if player.name == str(player_name))
-    player.mu = skill_data.mean
-    player.sigma = skill_data.stdev
-    player.update_skill()
-    print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
-
 def update_skills(players, ranks):
     """ Update player skills based on ranks from a match """
     teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
@@ -50,8 +42,13 @@ def update_skills(players, ranks):
     updated = calc.new_ratings(match, game_info)
     print ("Updating ranks")
     for team in updated:
-        for i, skill_data in team.items():
-            update_player_skill(players, i, skill_data)
+        player_name, skill_data = next(iter(team.items()))    #in Halite, teams will always be a team of one player
+        player = next(player for player in players if player.name == str(player_name))   #this suggests that players should be a dictionary instead of a list
+        player.mu = skill_data.mean
+        player.sigma = skill_data.stdev
+        player.update_skill()
+        print("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
+
 
 class Match:
     def __init__(self, players, width, height, seed, time_limit, keep_replays):
@@ -116,10 +113,9 @@ class Match:
                 elif count < self.num_players: # names
                     pass
                 elif count < (self.num_players * 2) + 1:
-                    token = line.split(" ")
-                    player = int(token[0]) - 1
-                    rank = int(token[1])
-                    self.results[player] = rank
+                    player_index, rank = map(int, line.split())
+                    player_index -= 1   #zero-based indexing
+                    self.results[player_index] = rank
                 count += 1
 
 class Manager:
@@ -132,13 +128,12 @@ class Manager:
         self.priority_sigma = True
         self.db = Database()
 
-    def run_round(self, players, width, height, seed):
-        o_players = [self.players[i] for i in players]
-        m = Match(o_players, width, height, seed, 2 * len(players) * max_match_rounds(width, height), self.keep_replays)
+    def run_round(self, contestants, width, height, seed):
+        m = Match(contestants, width, height, seed, 2 * len(contestants) * max_match_rounds(width, height), self.keep_replays)
         print(m)
         m.run_match(self.halite_binary)
         print(m)
-        self.save_players(o_players)
+        self.save_players(contestants)
         self.db.update_player_ranks()
 
     def save_players(self, players):
@@ -146,29 +141,30 @@ class Manager:
             print("Saving player %s with %f skill" % (player.name, player.skill))
             self.db.save_player(player)
 
-    def pick_players(self, num):
-        pool = list(range(len(self.players)))
-        players = list()
+    def pick_contestants(self, num):
+        pool = list(self.players)   #this makes a copy
+        contestants = list()
         if self.priority_sigma:
-            high_sigma_index = max((player.sigma, index, player) for index, player in enumerate(self.players))[1]
-            players.append(high_sigma_index)
-            pool.remove(high_sigma_index)
+            high_sigma_index = max((player.sigma, i) for i, player in enumerate(self.players))[1]
+            high_sigma_contestant = self.players[high_sigma_index]
+            contestants.append(high_sigma_contestant)
+            pool.remove(high_sigma_contestant)
             num -= 1
         random.shuffle(pool)
-        players.extend(pool[:num])
-        random.shuffle(players)
-        return players
+        contestants.extend(pool[:num])
+        random.shuffle(contestants)
+        return contestants
 
 
     def run_rounds(self):
         while (self.rounds < 0) or (self.round_count < self.rounds):
-            num_players = random.choice([2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6])
-            players = self.pick_players(num_players)
+            num_contestants = random.choice([2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6])
+            contestants = self.pick_contestants(num_contestants)
             size_w = random.choice([20, 25, 25] + [30] * 3 + [35] * 4 + [40] * 3 + [45, 45, 50])
             size_h = size_w
             seed = random.randint(10000, 2073741824)
             print ("running match...\n")
-            self.run_round(players, size_w, size_h, seed)
+            self.run_round(contestants, size_w, size_h, seed)
             self.round_count += 1
 
     def add_player(self, name, path):
