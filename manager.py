@@ -116,6 +116,7 @@ class Match:
                     player_index -= 1   #zero-based indexing
                     self.results[player_index] = rank
 
+
 class Manager:
     def __init__(self, halite_binary, players=None, rounds=-1):
         self.halite_binary = halite_binary
