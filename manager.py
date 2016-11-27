@@ -104,8 +104,7 @@ class Match:
         if len(lines) < (2 + (2 * self.num_players)):
             raise ValueError("Not enough lines in match output")
         else:
-            count = 0
-            for line in lines:
+            for count, line in enumerate(lines):
                 if count == self.num_players: # replay file and seed
                     self.replay_file = line.split(" ")[0]
                 elif count == (self.num_players * 2) + 1: # timeouts
@@ -116,7 +115,6 @@ class Match:
                     player_index, rank = map(int, line.split())
                     player_index -= 1   #zero-based indexing
                     self.results[player_index] = rank
-                count += 1
 
 class Manager:
     def __init__(self, halite_binary, players=None, rounds=-1):
@@ -135,6 +133,7 @@ class Manager:
         print(m)
         self.save_players(contestants)
         self.db.update_player_ranks()
+        self.db.add_match(m)
 
     def save_players(self, players):
         for player in players:
@@ -178,10 +177,6 @@ class Database:
     def __init__(self, filename=db_filename):
         self.db = sqlite3.connect(filename)
         self.recreate()
-        try:
-            self.latest = int(self.db.retrieve("select id from games order by id desc limit 1;",())[0][0])
-        except:
-            self.latest = 1
 
     def __del__(self):
         try:
@@ -189,12 +184,13 @@ class Database:
         except: pass
 
     def now(self):
-        return datetime.datetime.utcnow().strftime("%d.%m.%Y %H:%M:%S") #asctime()
+        return datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
     def recreate(self):
         cursor = self.db.cursor()
         try:
-            cursor.execute("create table games(id integer, players text, map integer, datum date, turns integer default 0)")
-            cursor.execute("create table players(id integer primary key autoincrement, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 25.0, sigma real default 8.33,ngames integer default 0, active integer default 1)")
+            cursor.execute("create table games(id integer primary key autoincrement, name text, finish integer, field_size integer, map_size integer, map_seed integer, timestamp date, replay_file text)")
+            cursor.execute("create table players(id integer primary key, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 25.0, sigma real default 8.33,ngames integer default 0, active integer default 1)")
             self.db.commit()
         except:
             pass
@@ -206,6 +202,11 @@ class Database:
     def update( self, sql, tup=() ):
         self.update_deferred(sql,tup)
         self.db.commit()
+
+    def update_many(self, sql, iterable):
+        cursor = self.db.cursor()
+        cursor.executemany(sql, iterable)
+        self.db.commit()
         
     def retrieve( self, sql, tup=() ):
         cursor = self.db.cursor()        
@@ -213,9 +214,7 @@ class Database:
         return cursor.fetchall()
 
     def add_match( self, match ):
-        self.latest += 1
-        players = ", ".join(match.paths)
-        self.update("insert into games values(?,?,?,?,?,?)", (self.latest,players,match.map_seed,self.now(),turns)) 
+        self.update_many("INSERT INTO games (name, finish, field_size, map_size, map_seed, timestamp, replay_file) VALUES (?,?,?,?,?,?,?)", [(player.name, rank, match.num_players, match.width, match.map_seed, self.now(), match.replay_file) for player, rank in zip(match.players, match.results)])
 
     def add_player(self, name, path):
         self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 25.0, 25.0/3.0, 0, True))
