@@ -25,6 +25,7 @@ import shutil
 import skills
 from skills import trueskill
 from subprocess import Popen, PIPE
+from keyboard_detection import keyboard_detection
 
 halite_command = "./halite"
 replay_dir = "replays"
@@ -157,15 +158,16 @@ class Manager:
 
 
     def run_rounds(self):
-        while (self.rounds < 0) or (self.round_count < self.rounds):
-            num_contestants = random.choice([2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6])
-            contestants = self.pick_contestants(num_contestants)
-            size_w = random.choice([20, 25, 25] + [30] * 3 + [35] * 4 + [40] * 3 + [45, 45, 50])
-            size_h = size_w
-            seed = random.randint(10000, 2073741824)
-            print ("running match...\n")
-            self.run_round(contestants, size_w, size_h, seed)
-            self.round_count += 1
+        with keyboard_detection() as key_pressed:
+            while not key_pressed() and ((self.rounds < 0) or (self.round_count < self.rounds)):
+                num_contestants = random.choice([2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6])
+                contestants = self.pick_contestants(num_contestants)
+                size_w = random.choice([20, 25, 25] + [30] * 3 + [35] * 4 + [40] * 3 + [45, 45, 50])
+                size_h = size_w
+                seed = random.randint(10000, 2073741824)
+                print ("running match...\n")
+                self.run_round(contestants, size_w, size_h, seed)
+                self.round_count += 1
 
     def add_player(self, name, path):
         p = self.db.get_player((name,))
@@ -402,7 +404,7 @@ class Commandline:
             self.run_matches(1)
         
         elif self.cmds.forever:
-            print ("Running matches until interrupted. Press Ctrl+C to stop.")
+            print ("Running matches until interrupted. Press any key to exit safely at the end of the current match.")
             self.run_matches(-1)
         
         elif self.no_args:
