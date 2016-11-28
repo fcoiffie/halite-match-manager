@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#  Copyright 2016 Jude Hungerford
 #  
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -24,12 +23,14 @@ import datetime
 import shutil
 import skills
 from skills import trueskill
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, call
 from keyboard_detection import keyboard_detection
+
 
 halite_command = "./halite"
 replay_dir = "replays"
 db_filename = "db.sqlite3"
+browser_binary = "firefox"
 
 def max_match_rounds(width, height):
     return math.sqrt(width * height) * 10.0
@@ -314,9 +315,15 @@ class Commandline:
         self.parser.add_argument("-m", "--match", dest="match",
                                  action = "store_true", default = False,
                                  help = "Run a single match")
+
         self.parser.add_argument("-f", "--forever", dest="forever",
                                  action = "store_true", default = False,
                                  help = "Run games forever (or until interrupted)")
+
+        self.parser.add_argument("-v", "--view", dest="view",
+                                 action = "store", default = "",
+                                 help = "View a replay in the web browser")
+
         self.parser.add_argument("-n", "--no-replays", dest="deleteReplays",
                                  action = "store_true", default = False,
                                  help = "Do not store replays")
@@ -391,6 +398,10 @@ class Commandline:
             print("Deactivating bot %s" %(self.cmds.deactivateBot))
             self.manager.db.deactivate_player(self.cmds.deactivateBot)
         
+        elif self.cmds.view:
+            print("Viewing replay %s" %(self.cmds.view))
+            view_replay(self.cmds.view)
+        
         elif self.cmds.showRanks:
             print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
             sql = self.player_list_sql()
@@ -413,6 +424,21 @@ class Commandline:
         
         elif self.no_args:
             self.parser.print_help()
+
+
+def view_replay(filename):
+    output_filename = filename.replace(".hlt", ".htm")
+    if not os.path.exists(output_filename):
+        with open(filename, 'r') as f:
+            replay_data = f.read()
+        with open("replays/Visualizer.htm") as f:
+            html = f.read()
+        html = html.replace("FILENAME", filename)
+        html = html.replace("REPLAY_DATA", replay_data)
+        with open(output_filename, 'w') as f:
+            f.write(html)
+    call ([browser_binary, output_filename])
+
 
 cmdline = Commandline()
 cmdline.parse(sys.argv[1:])
