@@ -122,6 +122,7 @@ class Manager:
     def __init__(self, halite_binary, players=None, rounds=-1):
         self.halite_binary = halite_binary
         self.players = players
+        self.players_min = 2
         self.rounds = rounds
         self.round_count = 0
         self.keep_replays = True
@@ -192,7 +193,7 @@ class Database:
     def recreate(self):
         cursor = self.db.cursor()
         try:
-            cursor.execute("create table games(id integer primary key autoincrement, name text, finish integer, field_size integer, map_size integer, map_seed integer, timestamp date, replay_file text)")
+            cursor.execute("create table games(id integer primary key, game_id integer, name text, finish integer, field_size integer, map_size integer, map_seed integer, timestamp date, replay_file text)")
             cursor.execute("create table players(id integer primary key, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 25.0, sigma real default 8.33,ngames integer default 0, active integer default 1)")
             self.db.commit()
         except:
@@ -217,7 +218,10 @@ class Database:
         return cursor.fetchall()
 
     def add_match( self, match ):
-        self.update_many("INSERT INTO games (name, finish, field_size, map_size, map_seed, timestamp, replay_file) VALUES (?,?,?,?,?,?,?)", [(player.name, rank, match.num_players, match.width, match.map_seed, self.now(), match.replay_file) for player, rank in zip(match.players, match.results)])
+        sql = 'SELECT max(game_id) FROM games'
+        game_id = self.retrieve(sql)[0][0]
+        game_id = int(game_id) + 1 if game_id else 1
+        self.update_many("INSERT INTO games (game_id, name, finish, field_size, map_size, map_seed, timestamp, replay_file) VALUES (?,?,?,?,?,?,?,?)", [(game_id, player.name, rank, match.num_players, match.width, match.map_seed, self.now(), match.replay_file) for player, rank in zip(match.players, match.results)])
 
     def add_player(self, name, path):
         self.update("insert into players values(?,?,?,?,?,?,?,?,?,?)", (None, name, path, self.now(), 1000, 0.0, 25.0, 25.0/3.0, 0, True))
