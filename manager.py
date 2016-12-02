@@ -74,7 +74,7 @@ class Match:
         title2 = "Binaries are " + ", ".join(self.paths) + "\n"
         dims = "dimensions = " + str(self.width) + ", " + str(self.height) + "\n"
         results = "\n".join([str(i) + " " + j for i, j in zip(self.results, [p.name for p in self.players])]) + "\n"
-        replay = self.replay_file + "\n\n"
+        replay = self.replay_file + "\n" #\n"
         return title1 + title2 + dims + results + replay
 
     def get_command(self, halite_binary):
@@ -93,12 +93,12 @@ class Match:
         self.parse_results_string()
         update_skills(self.players, copy.deepcopy(self.results))
         if self.keep_replay:
-            print("Keeping replay")
+            print("Keeping replay\n")
             if not os.path.exists(replay_dir):
                 os.makedirs(replay_dir)
             shutil.move(self.replay_file, replay_dir)
         else: 
-            print("Deleting replay")
+            print("Deleting replay\n")
             os.remove(self.replay_file)
 
     def parse_results_string(self):
@@ -128,6 +128,7 @@ class Manager:
         self.round_count = 0
         self.keep_replays = True
         self.priority_sigma = True
+        self.exclude_inactive = False
         self.db = Database()
 
     def run_round(self, contestants, width, height, seed):
@@ -138,6 +139,7 @@ class Manager:
         self.save_players(contestants)
         self.db.update_player_ranks()
         self.db.add_match(m)
+        self.show_ranks()
 
     def save_players(self, players):
         for player in players:
@@ -167,7 +169,7 @@ class Manager:
                 size_w = random.choice([20, 25, 25] + [30] * 3 + [35] * 4 + [40] * 3 + [45, 45, 50])
                 size_h = size_w
                 seed = random.randint(10000, 2073741824)
-                print ("running match...\n")
+                print ("\n------------------- running new match... -------------------\n")
                 self.run_round(contestants, size_w, size_h, seed)
                 self.round_count += 1
 
@@ -177,6 +179,18 @@ class Manager:
             self.db.add_player(name, path)
         else:
             print ("Bot name %s already used, no bot added" %(name))
+
+
+    def show_ranks(self, tsv=False):
+        print()
+        if tsv:
+            print ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
+        else:
+            print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
+        sql = "select * from players where active > 0 order by skill desc" if self.exclude_inactive else "select * from players order by skill desc"
+        for p in self.db.retrieve(sql):
+            print(str(parse_player_record(p)))
+
             
 class Database:
     def __init__(self, filename=db_filename):
@@ -283,7 +297,6 @@ class Commandline:
         self.cmds = None
         self.parser = argparse.ArgumentParser()
         self.no_args = False
-        self.exclude_inactive = False
         self.parser.add_argument("-A", "--addBot", dest="addBot",
                                  action = "store", default = "",
                                  help = "Add a new bot with a name")
@@ -360,12 +373,6 @@ class Commandline:
             self.manager.rounds = rounds
             self.manager.run_rounds()
 
-    def player_list_sql(self):
-        if self.exclude_inactive:
-            return "select * from players where active > 0 order by skill desc"
-        else:
-            return "select * from players order by skill desc"
-
     def act(self):
         if self.cmds.deleteReplays:
             print("keep_replays = False")
@@ -377,7 +384,7 @@ class Commandline:
             
         if self.cmds.excludeInactive:
             print("exclude_inactive = True")
-            self.exclude_inactive = True
+            self.manager.exclude_inactive = True
 
         if self.cmds.addBot:
             print("Adding new bot...")
@@ -403,16 +410,10 @@ class Commandline:
             view_replay(self.cmds.view)
         
         elif self.cmds.showRanks:
-            print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
-            sql = self.player_list_sql()
-            for p in self.manager.db.retrieve(sql):
-                print(str(parse_player_record(p)))
+            self.manager.show_ranks(tsv=False)
         
         elif self.cmds.showRanksTsv:
-            print ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
-            sql = self.player_list_sql()
-            for p in self.manager.db.retrieve(sql):
-                print(str(parse_player_record(p)))
+            self.manager.show_ranks(tsv=True)
         
         elif self.cmds.match:
             print ("Running a single match.")
