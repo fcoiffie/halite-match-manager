@@ -114,7 +114,7 @@ class Match:
                 elif count < self.num_players: # names
                     pass
                 elif count < (self.num_players * 2) + 1:
-                    player_index, rank = map(int, line.split())
+                    player_index, rank = list(map(int, line.split()))[:2]
                     player_index -= 1   #zero-based indexing
                     self.results[player_index] = rank
 
