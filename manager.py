@@ -186,7 +186,7 @@ class Manager:
         if tsv:
             print ("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
         else:
-            print ("%s\t\t%s\t\t%s\t%s\t\t%s\t\t%s\t\t%s\t%s" % ("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active"))
+            print ("{:<25}{:<20}{:^6}  {:^10}{:^10}{:^10}{:^8}{:^8}    {:<30}".format("name", "last_seen", "rank", "skill", "mu", "sigma", "ngames", "active", "path"))
         sql = "select * from players where active > 0 order by skill desc" if self.exclude_inactive else "select * from players order by skill desc"
         for p in self.db.retrieve(sql):
             print(str(parse_player_record(p)))
@@ -281,7 +281,7 @@ class Player:
         self.active = active
 
     def __repr__(self):
-        return "%s\t%s\t%d\t%3f\t%3f\t%3f\t%d\t%d" % (self.name, self.last_seen, self.rank, self.skill, self.mu, self.sigma, self.ngames, self.active)
+        return "{:<25}{:<20}{:^6}{:10.4f}{:10.4f}{:10.4f}   {:>5} {:>5}        {:<30}".format(self.name, str(self.last_seen), self.rank, self.skill, self.mu, self.sigma, self.ngames, self.active, self.path)
 
     def update_skill(self):
         self.skill = self.mu - (self.sigma * 3)
