@@ -170,27 +170,23 @@ class Manager:
         from keyboard_detection import keyboard_detection
         with keyboard_detection() as key_pressed:
             while not key_pressed() and ((self.rounds < 0) or (self.round_count < self.rounds)):
-                num_contestants = random.choice(player_dist)
-                contestants = self.pick_contestants(num_contestants)
-                size_w = random.choice(map_dist)
-                size_h = size_w
-                seed = random.randint(10000, 2073741824)
-                print ("\n------------------- running new match... -------------------\n")
-                self.run_round(contestants, size_w, size_h, seed)
-                self.round_count += 1
+                self.setup_round(player_dist, map_dist)
 
     def run_rounds_windows(self, player_dist, map_dist):
         import msvcrt
         with msvcrt.getch() as key_pressed:
-            while not key_pressed() and ((self.rounds < 0) or (self.round_count < self.rounds)):
-                num_contestants = random.choice(player_dist)
-                contestants = self.pick_contestants(num_contestants)
-                size_w = random.choice(map_dist)
-                size_h = size_w
-                seed = random.randint(10000, 2073741824)
-                print ("\n------------------- running new match... -------------------\n")
-                self.run_round(contestants, size_w, size_h, seed)
-                self.round_count += 1
+            while not key_pressed and ((self.rounds < 0) or (self.round_count < self.rounds)):
+                self.setup_round(player_dist, map_dist)
+
+    def setup_round (self, player_dist, map_dist):
+        num_contestants = random.choice(player_dist)
+        contestants = self.pick_contestants(num_contestants)
+        size_w = random.choice(map_dist)
+        size_h = size_w
+        seed = random.randint(10000, 2073741824)
+        print ("\n------------------- running new match... -------------------\n")
+        self.run_round(contestants, size_w, size_h, seed)
+        self.round_count += 1
 
     def add_player(self, name, path):
         p = self.db.get_player((name,))
