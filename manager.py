@@ -174,7 +174,7 @@ class Manager:
 
     def run_rounds_windows(self, player_dist, map_dist):
         import msvcrt
-            while not  msvcrt.getch()and ((self.rounds < 0) or (self.round_count < self.rounds)):
+            while not  msvcrt.kbhit()and ((self.rounds < 0) or (self.round_count < self.rounds)):
                 self.setup_round(player_dist, map_dist)
 
     def setup_round (self, player_dist, map_dist):
