@@ -95,7 +95,10 @@ class Match:
             print("Keeping replay\n")
             if not os.path.exists(replay_dir):
                 os.makedirs(replay_dir)
-            shutil.move(self.replay_file, replay_dir)
+            try:
+                shutil.move(self.replay_file, replay_dir)
+            except Exception as e:
+                print(e)
         else: 
             print("Deleting replay\n")
             os.remove(self.replay_file)
