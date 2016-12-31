@@ -108,6 +108,7 @@ class Match:
         if len(lines) < (2 + (2 * self.num_players)):
             raise ValueError("Not enough lines in match output")
         else:
+            del lines[self.num_players]  # delete size line
             for count, line in enumerate(lines):
                 if count == self.num_players: # replay file and seed
                     self.replay_file = line.split(" ")[0]
