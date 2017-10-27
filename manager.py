@@ -22,6 +22,7 @@ import argparse
 import datetime
 import shutil
 import skills
+import json
 from skills import trueskill
 from subprocess import Popen, PIPE, call
 
@@ -104,23 +105,27 @@ class Match:
             os.remove(self.replay_file)
 
     def parse_results_string(self):
-        lines = self.results_string.split("\n")
-        if len(lines) < (2 + (2 * self.num_players)):
-            raise ValueError("Not enough lines in match output")
-        else:
-            del lines[self.num_players]  # delete size line
-            for count, line in enumerate(lines):
-                if count == self.num_players: # replay file and seed
-                    self.replay_file = line.split(" ")[0]
-                elif count == (self.num_players * 2) + 1: # timeouts
-                    self.timeouts = (line.split(" "))
-                elif count < self.num_players: # names
-                    pass
-                elif count < (self.num_players * 2) + 1:
-                    player_index, rank = list(map(int, line.split()))[:2]
-                    player_index -= 1   #zero-based indexing
-                    self.results[player_index] = rank
-
+        #print(self.results_string)
+        j = json.loads(self.results_string)
+        print(j)
+        self.replay_file = j['replay']
+        # TODO Timeout
+        for i in range(self.num_players):
+            self.results[i] = j['stats'][str(i)]['rank']
+        #if len(lines) < (2 + (2 * self.num_players)):
+            #raise ValueError("Not enough lines in match output")
+        #else:
+            #for count, line in enumerate(lines):
+                #if count == self.num_players: # replay file and seed
+                    #self.replay_file = line.split(" ")[0]
+                #elif count == (self.num_players * 2) + 1: # timeouts
+                    #self.timeouts = (line.split(" "))
+                #elif count < self.num_players: # names
+                    #pass
+                #elif count < (self.num_players * 2) + 1:
+                    #player_index, rank = list(map(int, line.split()))[:2]
+                    #player_index -= 1   #zero-based indexing
+                    #self.results[player_index] = rank
 
 class Manager:
     def __init__(self, halite_binary, db_filename, players=None, rounds=-1):
@@ -184,8 +189,8 @@ class Manager:
     def setup_round (self, player_dist, map_dist):
         num_contestants = random.choice(player_dist)
         contestants = self.pick_contestants(num_contestants)
-        size_w = random.choice(map_dist)
-        size_h = size_w
+        size_w = random.choice([312, 264, 336, 240, 360, 384])
+        size_h = int((size_w * 2) / 3)
         seed = random.randint(10000, 2073741824)
         print ("\n------------------- running new match... -------------------\n")
         self.run_round(contestants, size_w, size_h, seed)
@@ -459,7 +464,7 @@ class Commandline:
             self.manager.exclude_inactive = True
 
         if self.cmds.player_dist is None:
-            self.cmds.player_dist = [2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6] if self.cmds.seed_dist else [2] * 5 + [3] * 8 + [4] * 9 + [5] * 8 + [6] * 5
+            self.cmds.player_dist = [2, 4] #[2] * 5 + [3] * 4 + [4] * 3 + [5] * 2 + [6] if self.cmds.seed_dist else [2] * 5 + [3] * 8 + [4] * 9 + [5] * 8 + [6] * 5
         print ('Using player distribution %s' % str(self.cmds.player_dist))
         print ('Using map distribution %s' % str(self.cmds.map_dist))
 
